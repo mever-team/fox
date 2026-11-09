@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FOX: Generalizable AI-Generated Image Detection with Embedding-Space Explanations</title>
+<meta name="description" content="FOX decouples a locked specialist detector from a lightweight VLM explainer, using a joint-embedding predictor into frozen text-embedding space, so explanation training cannot alter the verdict.">
+
+<script>
+  window.MathJax = {
+    tex: { inlineMath: [['\\(','\\)']], displayMath: [['\\[','\\]']] },
+    svg: { fontCache: 'global' }
+  };
+</script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=STIX+Two+Text:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#ffffff;
+  --surface:#ffffff;
+  --ink:#1a1512;
+  --ink-soft:#4a423c;
+  --ink-faint:#8a7f76;
+  --rule:#ece3d8;
+  --accent:#d9631c;
+  --accent-deep:#9c4512;
+  --accent-soft:#f0924f;
+  --accent-wash:#fdf0e4;
+  --radius:10px;
+  --maxw:860px;
+  --shadow:0 1px 2px rgba(26,21,18,0.04), 0 10px 26px -16px rgba(26,21,18,0.14);
+}
+
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:'STIX Two Text', 'Source Serif 4', Georgia, serif;
+  line-height:1.68;
+  -webkit-font-smoothing:antialiased;
+}
+::selection{ background:var(--accent-wash); color:var(--ink); }
+
+.wrap{ max-width:var(--maxw); margin:0 auto; padding:0 24px; }
+
+h1,h2,h3{ font-family:'STIX Two Text', Georgia, serif; font-weight:600; color:var(--ink); letter-spacing:-0.005em; }
+p{ color:var(--ink-soft); text-align:justify; hyphens:auto; }
+a{ color:var(--accent); text-decoration:none; }
+a:hover{ text-decoration:underline; }
+.sans{ font-family:'Inter',system-ui,sans-serif; }
+code, .mono{ font-family:'JetBrains Mono', monospace; }
+mjx-container{ color:inherit !important; }
+
+/* ---------- Header / Hero ---------- */
+header.hero{ padding:64px 0 36px; text-align:center; }
+.paper-logo{ width:96px; height:auto; margin:0 auto 20px; display:block; }
+h1.title{
+  font-size:clamp(21px, 2.7vw, 27px);
+  line-height:1.38;
+  margin:0 auto 22px;
+  max-width:none;
+  font-weight:700;
+}
+h1.title .model-name{ color:var(--accent); white-space:nowrap; }
+.model-name{ white-space:nowrap; }
+
+.authors{ font-family:'Inter',sans-serif; font-size:16px; color:var(--ink); margin-bottom:8px; }
+.authors .you{ color:var(--accent); font-weight:600; }
+.authors sup{ color:var(--accent-soft); font-weight:600; margin-left:1px; font-size:11px; }
+.affils{ font-family:'Inter',sans-serif; font-size:13.5px; color:var(--ink-faint); margin-bottom:30px; }
+.affils sup{ color:var(--accent-soft); margin-right:2px; }
+
+.links-row{ display:flex; flex-wrap:wrap; gap:10px; justify-content:center; font-family:'Inter',sans-serif;}
+.pill-link{
+  display:inline-flex; align-items:center; gap:7px;
+  padding:9px 18px; border-radius:999px;
+  border:1px solid var(--rule); background:var(--surface); color:var(--ink);
+  font-size:13.5px; font-weight:500; box-shadow:var(--shadow);
+  transition:transform .15s ease, border-color .15s ease, background .15s ease;
+}
+.pill-link:hover{ transform:translateY(-1px); border-color:var(--accent-soft); background:var(--accent-wash); text-decoration:none; color:var(--accent-deep); }
+.pill-link svg{ width:14.5px; height:14.5px; flex:none; }
+
+/* ---------- section nav ---------- */
+.section-nav{
+  position:sticky; top:0; z-index:40;
+  display:flex; gap:4px; overflow-x:auto;
+  justify-content:center;
+  padding:12px 24px;
+  background:rgba(255,255,255,0.92);
+  -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--rule);
+  scrollbar-width:none;
+}
+.section-nav::-webkit-scrollbar{ display:none; }
+.section-nav a{
+  flex:0 0 auto; font-family:'Inter',sans-serif; font-size:12.5px; font-weight:500;
+  color:var(--ink-faint); padding:6px 13px; border-radius:999px;
+  border:1px solid transparent; white-space:nowrap;
+}
+.section-nav a:hover{ color:var(--accent); text-decoration:none; }
+.section-nav a.active{ color:var(--accent); background:var(--accent-wash); border-color:var(--accent-soft); font-weight:600; }
+
+/* ---------- Sections ---------- */
+section{ padding:50px 0; border-top:1px solid var(--rule); }
+.section-label{
+  font-family:'JetBrains Mono', monospace; font-size:11.5px; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--accent); margin:0 0 10px;
+}
+h2.section-title{ font-size:24px; margin:0 0 20px; }
+h3.sub-title{ font-size:16.5px; margin:28px 0 10px; color:var(--ink); }
+.lede{ font-size:16.5px; }
+
+.card{ background:var(--surface); border:1px solid var(--rule); border-radius:var(--radius); box-shadow:var(--shadow); }
+.abstract-card{ padding:26px 30px; }
+.abstract-card p{ margin:0; font-size:16px; text-align:justify; }
+
+.def-block{ margin:22px 0; padding:20px 22px; border:1px solid var(--rule); border-radius:8px; background:var(--surface); position:relative; }
+.def-block .def-label{
+  position:absolute; top:-11px; left:16px; background:var(--bg); padding:0 8px;
+  font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.08em; color:var(--accent); text-transform:uppercase;
+}
+.def-block mjx-container{ color:var(--ink) !important; max-width:100%; }
+.def-block mjx-container[display="true"]{ overflow-x:auto; overflow-y:hidden; padding:2px 2px 8px; }
+.eq-note{ font-size:13.5px; color:var(--ink-faint); margin-top:10px; text-align:left; font-family:'Inter',sans-serif; }
+
+.stat-row{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; margin:26px 0 6px; font-family:'Inter',sans-serif;}
+.stat{ padding:16px 16px; text-align:left; }
+.stat .num{ font-family:'STIX Two Text',serif; font-size:25px; color:var(--accent); font-weight:700; }
+.stat .lab{ font-size:12.5px; color:var(--ink-faint); margin-top:4px; }
+
+.fig-card{ margin-top:26px; padding:18px; }
+.fig-card img{ width:100%; border-radius:6px; background:#fff; display:block; }
+.fig-caption{ font-size:13.5px; color:var(--ink-faint); margin-top:14px; line-height:1.55; font-family:'Inter',sans-serif; text-align:left;}
+.fig-caption b{ color:var(--ink-soft); }
+
+/* selector (examples) */
+.unc-nav{ display:flex; gap:8px; margin:22px 0 18px; flex-wrap:wrap; justify-content:center; }
+.unc-thumb{ width:56px; height:56px; border-radius:7px; overflow:hidden; cursor:pointer; border:2px solid var(--rule); opacity:.55; transition:opacity .15s, border-color .15s; }
+.unc-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+.unc-thumb.active{ opacity:1; border-color:var(--accent); }
+.example-card{ display:grid; grid-template-columns:200px 1fr; gap:22px; align-items:start; }
+.example-card img{ width:100%; border-radius:8px; border:1px solid var(--rule); cursor:zoom-in; }
+.example-card .src-label{ font-family:'Inter',sans-serif; font-size:11.5px; color:var(--ink-faint); margin-bottom:6px; }
+.example-card .verdict{ display:inline-block; font-family:'Inter',sans-serif; font-size:11.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:#fff; background:var(--accent); padding:4px 10px; border-radius:5px; margin-bottom:10px; }
+.example-card .verdict.real{ background:#2e8b57; }
+.example-card p{ font-size:14.5px; margin:0; }
+@media (max-width:640px){ .example-card{ grid-template-columns:1fr; } }
+
+.limits-list{ margin:18px 0 0; padding-left:0; list-style:none; }
+.limits-list li{ display:flex; gap:12px; margin-bottom:12px; font-size:14.5px; color:var(--ink-soft); text-align:left;}
+.limits-list .tag{ flex:0 0 auto; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--accent); border:1px solid var(--accent-soft); border-radius:5px; padding:2px 7px; height:fit-content; }
+
+.bib-card{ position:relative; margin-top:20px; }
+.bib-card pre{ margin:0; padding:24px 26px; overflow-x:auto; font-family:'JetBrains Mono',monospace; font-size:12.8px; line-height:1.7; color:var(--ink-soft); }
+.bib-card .copy-btn{ position:absolute; top:14px; right:14px; font-family:'Inter',sans-serif; font-size:12.5px; font-weight:500; padding:6px 12px; border-radius:6px; border:1px solid var(--rule); background:#fff; color:var(--ink-soft); cursor:pointer; }
+.bib-card .copy-btn:hover{ color:var(--accent); border-color:var(--accent-soft); }
+.bib-card .copy-btn.copied{ color:#1a8a4e; border-color:#1a8a4e; }
+
+.lightbox{ position:fixed; inset:0; background:rgba(20,14,10,.9); display:none; align-items:center; justify-content:center; z-index:100; padding:30px; cursor:zoom-out;}
+.lightbox.open{ display:flex; }
+.lightbox img{ max-width:min(92vw,960px); max-height:88vh; border-radius:8px; box-shadow:0 20px 60px rgba(0,0,0,.5); }
+
+@media (max-width:640px){ header.hero{ padding:52px 0 30px; } section{ padding:38px 0; } p{ text-align:left; } .motive-grid{ grid-template-columns:1fr !important; } }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <img class="paper-logo" src="assets/logo.png" alt="FOX logo">
+    <h1 class="title"><span class="model-name">FOX</span>: Generalizable AI-Generated Image Detection with<br>Embedding-Space Explanations</h1>
+
+    <div class="authors">
+      <span class="you">Nikos Giakoumoglou</span><sup>1</sup> &nbsp;&middot;&nbsp;
+      <span class="you">Paschalis Giakoumoglou</span><sup>2</sup> &nbsp;&middot;&nbsp;
+      <span>Tania Stathaki</span><sup>1</sup> &nbsp;&middot;&nbsp;
+      <span>Symeon Papadopoulos</span><sup>2</sup>
+    </div>
+    <div class="affils">
+      <sup>1</sup>Imperial College London &nbsp;&nbsp; <sup>2</sup>Information Technologies Institute, CERTH
+    </div>
+
+    <div class="links-row">
+      <a class="pill-link" href="https://arxiv.org/abs/2611.04111" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.8423 0a1.0037 1.0037 0 0 0-.922.6078c-.1536.3687-.0438.6275.2938 1.1113l6.9185 8.3597-1.0223 1.1058a1.0393 1.0393 0 0 0 .003 1.4229l1.2292 1.3135-5.4391 6.4444c-.2803.299-.4538.823-.2971 1.1986a1.0253 1.0253 0 0 0 .9585.635.9133.9133 0 0 0 .6891-.3405l5.783-6.126 7.4902 8.0051a.8527.8527 0 0 0 .6835.2597.9575.9575 0 0 0 .8777-.6138c.1577-.377-.017-.7502-.306-1.1407l-7.0518-8.3418 1.0632-1.13a.9626.9626 0 0 0 .0089-1.3165L4.6336.4639s-.3733-.4535-.768-.463zm0 .272h.0166c.2179.0052.4874.2715.5644.3639l.005.006.0052.0055 10.169 10.9905a.6915.6915 0 0 1-.0072.945l-1.0666 1.133-1.4982-1.7724-8.5994-10.39c-.3286-.472-.352-.6183-.2592-.841a.7307.7307 0 0 1 .6704-.4401Zm14.341 1.5701a.877.877 0 0 0-.6554.2418l-5.6962 6.1584 1.6944 1.8319 5.3089-6.5138c.3251-.4335.479-.6603.3247-1.0292a1.1205 1.1205 0 0 0-.9763-.689zm-7.6557 12.2823 1.3186 1.4135-5.7864 6.1295a.6494.6494 0 0 1-.4959.26.7516.7516 0 0 1-.706-.4669c-.1119-.2682.0359-.6864.2442-.9083l.0051-.0055.0047-.0055z"/></svg>
+        arXiv
+      </a>
+      <a class="pill-link" href="https://github.com/mever-team/fox" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.73.5.5 5.74.5 12.03c0 5.03 3.26 9.29 7.79 10.8.57.1.78-.25.78-.55 0-.27-.01-1.17-.02-2.12-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.68 1.25 3.33.95.1-.74.4-1.25.72-1.54-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.8 10.8 0 0 1 5.72 0c2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.37-2.67 5.33-5.21 5.62.41.35.78 1.04.78 2.1 0 1.52-.01 2.74-.01 3.11 0 .3.2.66.79.55A10.53 10.53 0 0 0 23.5 12.03C23.5 5.74 18.27.5 12 .5z"/></svg>
+        Code
+      </a>
+      <a class="pill-link" href="#bibtex">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        BibTeX
+      </a>
+    </div>
+  </div>
+</header>
+
+<nav class="section-nav" id="sectionNav">
+  <a href="#overview">Overview</a>
+  <a href="#abstract">Abstract</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#method">Method</a>
+  <a href="#results">Results</a>
+  <a href="#conclusion">Conclusion</a>
+  <a href="#bibtex">BibTeX</a>
+</nav>
+
+<main>
+
+<section id="overview">
+  <div class="wrap">
+    <p class="section-label">Overview</p>
+    <h2 class="section-title">TL;DR</h2>
+    <p class="lede"><span class="model-name">FOX</span> first builds and locks a specialist DINOv3 detector, then uses a joint-embedding predictor to map its locked visual evidence into a frozen text encoder's semantic space, which a lightweight VLM verbalizes as a forensic explanation on demand. Because explanation training happens strictly after the verdict is locked, it cannot alter detection: <b style="color:var(--ink)">the detector decides, language only explains</b>.</p>
+  </div>
+</section>
+
+<section id="abstract">
+  <div class="wrap">
+    <p class="section-label">Abstract</p>
+    <div class="card abstract-card">
+      <p>
+      AI-generated images have reached unprecedented realism, while instruction-driven AI editors re-synthesize images for local changes, leaving no splice boundary to localize. Most detectors are black boxes with unverifiable verdicts and generalize poorly because adapting a backbone on the detection distribution memorizes generator-specific fingerprints that quickly become obsolete. Specialist detectors built on pure-vision representations, particularly DINOv3, generalize well across generators, but explainable methods forgo this advantage: jointly training one multimodal model for classification and language generation subjects its visual representation to the language objective. We therefore require that explanation training cannot alter the verdict. We introduce <span class="model-name">FOX</span>, which first builds and locks a specialist DINOv3 detector, then uses its representation to guide a lightweight VLM toward forensic explanation. A joint-embedding predictor maps locked visual evidence into a frozen text encoder's semantic space, producing guidance that the VLM verbalizes on demand. <span class="model-name">FOX</span> achieves 97.4 mean AUC across 14 unseen generators, 69.8 BERTScore on XPlainVerse, and 56.1 on LOKI.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section id="motivation">
+  <div class="wrap">
+    <p class="section-label">Motivation</p>
+    <h2 class="section-title">Why decouple detection from explanation?</h2>
+    <p class="lede">Instruction-following editors now re-synthesize an entire image rather than splicing a region into it, so there is no pasted patch or boundary to localize, and forensic localization operates near chance. A bare real-or-fake score is then of limited use: journalists, moderators, and users need to know <i>why</i> an image was flagged. Four problems stand in the way, each pulling against the others.</p>
+
+    <div class="motive-grid" style="display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-top:24px;">
+      <div class="card" style="padding:20px 20px 22px;">
+        <div class="k" style="font-size:11.5px;font-family:'JetBrains Mono',monospace;color:var(--accent-soft);margin-bottom:8px;">01</div>
+        <h4 style="margin:0 0 8px;font-size:15.5px;font-family:'STIX Two Text',serif;">Unverifiable verdicts</h4>
+        <p style="font-size:14px;text-align:left;margin:0;">Most detectors are black boxes: humans cannot check why a verdict was reached.</p>
+      </div>
+      <div class="card" style="padding:20px 20px 22px;">
+        <div class="k" style="font-size:11.5px;font-family:'JetBrains Mono',monospace;color:var(--accent-soft);margin-bottom:8px;">02</div>
+        <h4 style="margin:0 0 8px;font-size:15.5px;font-family:'STIX Two Text',serif;">Fingerprints go stale</h4>
+        <p style="font-size:14px;text-align:left;margin:0;">Unconstrained backbone adaptation memorizes generator-specific traces that transfer poorly to new generators.</p>
+      </div>
+      <div class="card" style="padding:20px 20px 22px;">
+        <div class="k" style="font-size:11.5px;font-family:'JetBrains Mono',monospace;color:var(--accent-soft);margin-bottom:8px;">03</div>
+        <h4 style="margin:0 0 8px;font-size:15.5px;font-family:'STIX Two Text',serif;">Artifacts fade</h4>
+        <p style="font-size:14px;text-align:left;margin:0;">High-frequency traces that improving generators mimic, and that resizing or compression destroys.</p>
+      </div>
+      <div class="card" style="padding:20px 20px 22px;">
+        <div class="k" style="font-size:11.5px;font-family:'JetBrains Mono',monospace;color:var(--accent-soft);margin-bottom:8px;">04</div>
+        <h4 style="margin:0 0 8px;font-size:15.5px;font-family:'STIX Two Text',serif;">Language hurts vision</h4>
+        <p style="font-size:14px;text-align:left;margin:0;">Explainable MLLM detectors jointly optimize classification and generation, so the language objective reshapes the very representation detection depends on, and weakens it.</p>
+      </div>
+    </div>
+
+    <h3 class="sub-title">Our approach</h3>
+    <p>We ask: rather than making one model responsible for both perception and language, can we first obtain the strongest possible detector and use its representation to help a lightweight VLM explain the fixed verdict? A JEPA provides a natural interface: it predicts <i>what the forensic evidence says</i> rather than one exact token realization, targeting the semantic space of a frozen text encoder where semantically equivalent explanations stay nearby despite different wording. A VLM then verbalizes that representation only when requested, with the detector permanently locked throughout.</p>
+  </div>
+</section>
+
+<section id="method">
+  <div class="wrap">
+    <p class="section-label">Method</p>
+    <h2 class="section-title">Three training stages</h2>
+    <p class="lede"><span class="model-name">FOX</span> (<b>FO</b>rensic e<b>X</b>planations) separates detection from explanation into three stages, each with its own objective and frozen components, so a later stage can never reach back and change an earlier one's verdict.</p>
+
+    <div class="fig-card card">
+      <img src="assets/inference.png" alt="FOX inference pipeline: detection via the locked X-Encoder and Classifier, explanation via the Predictor and Y-Decoder">
+    </div>
+    <p class="fig-caption"><b>Inference in FOX.</b> <b>(Top)</b> Detection uses a pure-vision encoder: the verdict is read from the Classifier logits over the adapted X-Encoder, without language-model decoding. <b>(Bottom)</b> Explanation is separate: Predictor<sub>FT</sub> converts the detector's visual representation into caption-space forensic guidance that the Y-Decoder verbalizes, conditioned on the locked verdict.</p>
+
+    <h3 class="sub-title">Stage 1 &mdash; verdict prediction</h3>
+    <p>A LoRA-adapted DINOv3 encoder (the X-Encoder) is trained jointly with a linear classifier under cross-entropy on the binary authenticity label alone; no caption, text encoder, or explanation objective participates. Checkpoints are selected by AUC on an external validation set whose generators are disjoint from training. The selected encoder and classifier are then <b>locked</b> and define the verdict function used for the rest of the pipeline.</p>
+
+    <h3 class="sub-title">Stage 2 &mdash; joint embedding prediction</h3>
+    <p>With the X-Encoder locked and a text Y-Encoder frozen, a predictor is trained to align each predicted embedding \(\hat{s}_y\) with the target embedding \(s_y\) of its own reference explanation, contrasted against the other explanations in the batch:</p>
+    <div class="def-block">
+      <span class="def-label">Stage 2 objective</span>
+      \[ \mathcal{L}_{\text{pred}} = -\log \frac{\exp(\mathrm{sim}(\hat{s}_y, s_y) / \tau)}{\sum_{j} \exp(\mathrm{sim}(\hat{s}_y, s_y^{(j)}) / \tau)} \]
+      <p class="eq-note">Because the Y-Encoder is frozen, the targets are fixed points in a pretrained space, so the trivial solution where both sides collapse to a constant is unavailable, and the contrastive term further penalizes a constant predictor directly.</p>
+    </div>
+
+    <h3 class="sub-title">Stage 3 &mdash; explanation decoding</h3>
+    <p>A language-side LoRA on the Y-Decoder first learns to generate reference explanations conditioned only on the image and the locked verdict written into the prompt as a word. A small cross-attention module with four learned query slots then attends over the predictor's hidden state to produce query vectors, fine-tuned jointly with the predictor via a symmetric query-to-sentence InfoNCE objective. Finally, a zero-initialized residual adapter conditions the decoder's visual tokens on these query vectors, trained alone with cross-entropy on the reference explanations.</p>
+  </div>
+</section>
+
+<section id="results">
+  <div class="wrap">
+    <p class="section-label">Results</p>
+    <h2 class="section-title">Strong detection, robust to perturbation</h2>
+    <p class="lede">Under a common readout, view-consistency self-supervised encoders transfer best for forensic detection, with DINOv3 the strongest; brief LoRA adaptation selected on an external generator distribution further improves transfer. The resulting detector generalizes across 14 unseen generators while staying robust to common image perturbations.</p>
+
+    <div class="stat-row">
+      <div class="card stat"><div class="num">97.4</div><div class="lab">mean AUC across 14 unseen generators</div></div>
+      <div class="card stat"><div class="num">69.8</div><div class="lab">BERTScore on XPlainVerse explanations</div></div>
+      <div class="card stat"><div class="num">56.1</div><div class="lab">BERTScore on LOKI explanations</div></div>
+      <div class="card stat"><div class="num">&#10003;</div><div class="lab">robust to resizing, compression &amp; blur, where artifact-driven detectors degrade</div></div>
+    </div>
+  </div>
+</section>
+
+<section id="examples">
+  <div class="wrap">
+    <p class="section-label">Qualitative examples</p>
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px;">
+      <h2 class="section-title" style="margin-bottom:0;">What does the FOX say?</h2>
+      <a class="pill-link" href="https://www.youtube.com/watch?v=jofNR_WkoCE" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        Play the song
+      </a>
+    </div>
+    <p class="lede" style="margin-top:20px;">The guided Y-Decoder verbalizes the forensic evidence captured by the locked detector's representation, for both fakes and real images, including generators never seen during training. Select an example:</p>
+
+    <div class="unc-nav" id="exNav"></div>
+    <div class="card example-card" id="exDisplay" style="padding:22px;"></div>
+  </div>
+</section>
+
+<section id="conclusion">
+  <div class="wrap">
+    <p class="section-label">Conclusion</p>
+    <h2 class="section-title">The detector decides, language only explains</h2>
+    <p>We presented <span class="model-name">FOX</span>, which decouples reliable detection from forensic explanation. A briefly adapted DINOv3 detector transfers strongly across unseen generators and remains robust to common perturbations. Once locked, a joint-embedding predictor maps its visual evidence into a frozen text space that guides a lightweight VLM. Explanation training therefore cannot alter the verdict, and still benefits from the specialist detector's representation. Our results show that strong detection and explanation need not compete: the detector decides, and language only explains the fixed verdict.</p>
+  </div>
+</section>
+
+<section id="bibtex">
+  <div class="wrap">
+    <p class="section-label">Citation</p>
+    <h2 class="section-title">BibTeX</h2>
+    <div class="card bib-card">
+      <button class="copy-btn" id="copyBibBtn">Copy</button>
+      <pre id="bibtexText">@misc{giakoumoglou2026fox,
+      title={{Generalizable AI-Generated Image Detection with Embedding-Space Explanations}},
+      author={Nikos Giakoumoglou and Paschalis Giakoumoglou and Tania Stathaki and Symeon Papadopoulos},
+      year={2026},
+      eprint={2611.04111},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2611.04111},
+}</pre>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<div class="lightbox" id="lightbox"><img id="lightboxImg" src="" alt=""></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- section nav active state ---------- */
+  var navLinks = Array.from(document.querySelectorAll('.section-nav a'));
+  var navMap = {};
+  navLinks.forEach(function(a){ navMap[a.getAttribute('href').slice(1)] = a; });
+  var navSections = Object.keys(navMap).map(function(id){ return document.getElementById(id); }).filter(Boolean);
+  if('IntersectionObserver' in window){
+    var navObserver = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if(entry.isIntersecting){
+          navLinks.forEach(function(a){ a.classList.remove('active'); });
+          var link = navMap[entry.target.id];
+          if(link){ link.classList.add('active'); link.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
+        }
+      });
+    }, { rootMargin: '-45% 0px -50% 0px', threshold: 0 });
+    navSections.forEach(function(s){ navObserver.observe(s); });
+  }
+
+  /* ---------- lightbox ---------- */
+  var lb = document.getElementById('lightbox');
+  var lbImg = document.getElementById('lightboxImg');
+  function openLightbox(src, alt){ lbImg.src = src; lbImg.alt = alt || ''; lb.classList.add('open'); }
+  lb.addEventListener('click', function(){ lb.classList.remove('open'); lbImg.src=''; });
+  document.addEventListener('click', function(e){
+    var t = e.target;
+    if(t.tagName === 'IMG' && t.closest('.example-card')){ openLightbox(t.src, t.alt); }
+  });
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape'){ lb.classList.remove('open'); lbImg.src=''; } });
+
+  /* ---------- qualitative example selector ---------- */
+  var exNav = document.getElementById('exNav');
+  var exDisplay = document.getElementById('exDisplay');
+  var examples = [
+    {
+      img: 'assets/example_1.jpg', verdict: 'Fake',
+      explanation: "The image contains a significant visual anomaly where the horse's tail appears as a bright, neon blue color that lacks any natural texture or lighting consistency with the rest of the animal. This vibrant blue hue is unnaturally saturated and does not match the muted, earthy tones of the horse's coat or the surrounding environment. The edges of the blue tail are overly sharp and lack the motion blur seen in the horse's legs and the dust kicked up by its hooves, making it look like a flat digital overlay rather than a physical part of the scene."
+    },
+    {
+      img: 'assets/example_2.jpg', verdict: 'Fake',
+      explanation: "The image contains several visual inconsistencies that suggest manipulation. Most notably, the 'MLB CAMP 1985' text on the wooden fence appears unnaturally sharp and flat compared to the weathered texture of the wood it is painted on; the letters do not follow the slight curves or grain of the wood surface. There is also a noticeable smudge and loss of detail directly behind the fence, where background elements seem to have been blurred or erased, leaving a patchy, unnatural texture in the grass and trees."
+    },
+    {
+      img: 'assets/example_3.jpg', verdict: 'Fake', conf: '97.3%', label: 'GPT-Image-1.5 · unseen generator',
+      explanation: "Visual inconsistencies appear around the man's face and the accordion. His facial features are unnaturally smoothed and lack the fine skin texture seen on his hands, giving a ‘plastic’ look. Blurring is visible where his jawline meets the background, and the lighting on his face does not match the warm glow from the lantern behind him."
+    },
+    {
+      img: 'assets/example_4.jpg', verdict: 'Fake', conf: '94.4%', label: 'GPT-Image-2 · unseen generator',
+      explanation: "The white wolf has a soft, airbrushed texture that lacks the fine fur detail present in the surrounding environment. The lighting on its body is inconsistent with the deep blue ambient light of the night sky, and it casts no realistic shadow onto the rock beneath it."
+    },
+    {
+      img: 'assets/example_5.jpg', verdict: 'Fake', conf: '99.96%', label: 'Veo-3 · unseen generator',
+      explanation: "The man's eyes are unnaturally wide and bulging, with a noticeable loss of skin texture around the eyelids. The cats' fur overlapping his jacket lacks realistic depth and appears as flat overlays rather than strands sitting on fabric."
+    },
+    {
+      img: 'assets/example_6.jpg', verdict: 'Fake', conf: '80.4%', label: 'Nano Banana Pro · unseen generator',
+      explanation: "Visual inconsistencies cluster around the gingerbread sled. The white decorative trim is unnaturally flat, and the blue icing on the boots has a digital, painted-on quality that does not follow the natural contours of the dough."
+    },
+    {
+      img: 'assets/example_7.jpg', verdict: 'Real', label: 'XPlainVerse',
+      explanation: "This picture looks real because the boy's hair is all messy and flying up in the air. It shows he was really moving fast on his skateboard, just like when you jump or turn really quickly."
+    }
+  ];
+  examples.forEach(function(ex, idx){
+    var d = document.createElement('div');
+    d.className = 'unc-thumb' + (idx===0 ? ' active' : '');
+    d.innerHTML = '<img src="'+ex.img+'" alt="Example '+(idx+1)+'">';
+    d.addEventListener('click', function(){
+      document.querySelectorAll('#exNav .unc-thumb').forEach(function(el){ el.classList.remove('active'); });
+      d.classList.add('active');
+      renderExample(idx);
+    });
+    exNav.appendChild(d);
+  });
+  function renderExample(idx){
+    var ex = examples[idx];
+    var labelHtml = ex.label ? '<div class="src-label">'+ex.label+'</div>' : '';
+    var verdictCls = ex.verdict === 'Real' ? 'verdict real' : 'verdict';
+    var verdictText = 'Detected: ' + ex.verdict + (ex.conf ? ' ('+ex.conf+')' : '');
+    exDisplay.innerHTML =
+      '<img src="'+ex.img+'" alt="'+ex.verdict+' image, example '+(idx+1)+'">' +
+      '<div>'+labelHtml+'<span class="'+verdictCls+'">'+verdictText+'</span><p>'+ex.explanation+'</p></div>';
+  }
+  renderExample(0);
+
+  /* ---------- copy bibtex ---------- */
+  var copyBtn = document.getElementById('copyBibBtn');
+  copyBtn.addEventListener('click', function(){
+    var text = document.getElementById('bibtexText').textContent;
+    function done(){ copyBtn.textContent = 'Copied'; copyBtn.classList.add('copied'); setTimeout(function(){ copyBtn.textContent = 'Copy'; copyBtn.classList.remove('copied'); }, 1600); }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(done).catch(function(){ try{ fallbackCopy(text); done(); }catch(e){} });
+    } else { try{ fallbackCopy(text); done(); }catch(e){} }
+    function fallbackCopy(t){ var ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }
+  });
+
+})();
+</script>
+</body>
+</html>
