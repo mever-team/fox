@@ -10,7 +10,7 @@ Official PyTorch implementation of **FOX** (FOrensic eXplanations). FOX combines
 
 > **Generalizable AI-Generated Image Detection with Embedding-Space Explanations**  
 > Nikos Giakoumoglou, Paschalis Giakoumoglou, Tania Stathaki, Symeon Papadopoulos — **WACV 2027**  
-> [Paper](https://arxiv.org/pdf/2611.04111)
+> [Paper](https://arxiv.org/pdf/2611.04111) | [Website](https://mever-team.github.io/fox/) | [Code](https://github.com/mever-team/fox)
 
 ---
 
