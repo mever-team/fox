@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/logo.png" alt="FOX logo" width="120">
+</p>
+
 # Generalizable AI-Generated Image Detection with Embedding-Space Explanations
 
 Official PyTorch implementation of **FOX** (FOrensic eXplanations). FOX combines a specialist visual detector with embedding-space prediction to provide natural-language forensic explanations without altering detection decisions.
